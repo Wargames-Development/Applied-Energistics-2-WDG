@@ -1,121 +1,113 @@
-/*
- * This file is part of Applied Energistics 2.
- * Copyright (c) 2013 - 2014, AlgorithmX2, All rights reserved.
- *
- * Applied Energistics 2 is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Applied Energistics 2 is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Applied Energistics 2.  If not, see <http://www.gnu.org/licenses/lgpl>.
- */
-
-apply plugin: 'forge'
-
-apply from: 'gradle/scripts/dependencies.gradle'
-apply from: 'gradle/scripts/artifacts.gradle'
-apply from: 'gradle/scripts/autoinstallruntime.gradle'
-apply from: 'gradle/scripts/integration.gradle'
-apply from: 'gradle/scripts/optional.gradle'
+import java.util.Properties
 
 buildscript {
     repositories {
-        mavenLocal()
+        maven { url = 'https://maven.minecraftforge.net/' }
         mavenCentral()
-
-        maven {
-            name = "forge"
-            url = "http://files.minecraftforge.net/maven"
-        }
-
-        maven {
-            name = "sonatype"
-            url = "https://oss.sonatype.org/content/repositories/snapshots/"
-        }
     }
-
     dependencies {
-        classpath 'net.minecraftforge.gradle:ForgeGradle:1.2-SNAPSHOT'
+        classpath('com.anatawa12.forge:ForgeGradle:1.2-1.0.+') { changing = true }
     }
 }
 
-sourceCompatibility = JavaVersion.VERSION_1_6
-targetCompatibility = JavaVersion.VERSION_1_6
+apply plugin: 'forge'
 
-version = aeversion + "-" + aechannel + "-" + aebuild
-group = aegroup
-archivesBaseName = aebasename
+group = "com.wdg"
+archivesBaseName = jarBaseName
 
-// If TeamCity is running this build, lets set the version info
-if (hasProperty("teamcity")) {
-    version = teamcity["build.number"]
+def mcVersion = "1.7.10"
+def forgeVersion = "${mcVersion}-10.13.4.1614-1.7.10"
 
-    // Fix for main branch being built
-    version = version.replaceAll("/", "-")
+def gradlePropsFile = file("gradle.properties")
+def persistedProps = new Properties()
+gradlePropsFile.withInputStream { persistedProps.load(it) }
+
+def currentBuildNumber = (persistedProps.getProperty("modBuildNumber") ?: "0").toInteger()
+
+def requestedTasks = gradle.startParameter.taskNames.collect { it.toLowerCase() }
+def shouldAutoIncrement = requestedTasks.isEmpty() || requestedTasks.any { taskName ->
+    taskName == "build" ||
+            taskName.endsWith(":build") ||
+            taskName == "assemble" ||
+            taskName.endsWith(":assemble") ||
+            taskName == "reobf" ||
+            taskName.endsWith(":reobf") ||
+            taskName == "jar" ||
+            taskName.endsWith(":jar")
 }
 
-// Add Coremod Manifest
-jar {
-    manifest {
-        attributes 'FMLCorePlugin': 'appeng.transformer.AppEngCore'
-        attributes 'FMLCorePluginContainsFMLMod': 'true'
-    }
+def effectiveBuildNumber = shouldAutoIncrement ? currentBuildNumber + 1 : currentBuildNumber
+def baseVersion = "${modMainVersion}.${modSubVersion}.${modPatchVersion}_X${effectiveBuildNumber}"
+def branchSuffix = (project.hasProperty("branch") && project.branch) ? "-${project.branch}" : ""
+def modVersionString = "${baseVersion}${branchSuffix}"
 
-    // specify which files are really included, can control which APIs should be in
-    include "appeng/**"
-    include "assets/**"
-    include "mcmod.info"
-    include "pack.mcmeta"
-}
+version = modVersionString
+
+compileJava.options.encoding = 'UTF-8'
+sourceCompatibility = targetCompatibility = '1.8'
 
 minecraft {
-    version = minecraft_version + "-" + forge_version
+    version = forgeVersion
+    runDir = "eclipse"
 
-    replaceIn "AEConfig.java"
-    replaceIn "package-info.java"
-
-    replace "@version@", project.version
-    replace "@aeversion@", aeversion
-    replace "@aechannel@", aechannel
-    replace "@aebuild@", aebuild
-
-    // used when launching minecraft in dev env
-    runDir = "run"
+    replace "@VERSION@", modVersionString
+    replaceIn "vazkii/ambience/Ambience.java"
 }
 
-sourceSets {
-    main {
-        java {
-            srcDirs += 'src/api/java'
-            srcDirs += 'src/main/java/'
-        }
+repositories {
+    mavenCentral()
+}
 
-        resources {
-            srcDir "src/main/resources/"
-            include "assets/appliedenergistics2/recipes/**/*.recipe",
-                    "assets/appliedenergistics2/recipes/README.html",
-                    "assets/appliedenergistics2/lang/*.lang",
-                    "assets/appliedenergistics2/textures/blocks/*",
-                    "assets/appliedenergistics2/textures/guis/*",
-                    "assets/appliedenergistics2/textures/models/*",
-                    "assets/appliedenergistics2/textures/items/*",
-                    "assets/appliedenergistics2/meta/*",
-                    "mcmod.info",
-                    "pack.mcmeta"
-        }
-    }
+dependencies {
 }
 
 processResources {
-    // replace stuff in mcmod.info, nothing else
+    inputs.property "version", modVersionString
+    inputs.property "mcversion", mcVersion
+    inputs.property "modid", modBaseName
+    inputs.property "name", modDisplayName
+
     from(sourceSets.main.resources.srcDirs) {
         include 'mcmod.info'
-        expand 'version': project.version, 'mcversion': minecraft_version
+        expand([
+                version  : modVersionString,
+                mcversion: mcVersion,
+                modid    : modBaseName,
+                name     : modDisplayName
+        ])
+    }
+
+    from(sourceSets.main.resources.srcDirs) {
+        exclude 'mcmod.info', '**/psd/**'
+    }
+}
+
+jar {
+    def fullVersion = "${modMainVersion}.${modSubVersion}.${modPatchVersion}_X${effectiveBuildNumber}"
+    def suffix = (project.hasProperty("branch") && project.branch) ? "-${project.branch}" : ""
+    baseName = "${jarBaseName}-${fullVersion}${suffix}"
+    version = null
+    destinationDir = file("build/libs")
+}
+
+task persistBuildNumber {
+    onlyIf { shouldAutoIncrement }
+
+    doLast {
+        def updatedProps = new Properties()
+        gradlePropsFile.withInputStream { updatedProps.load(it) }
+        updatedProps.setProperty("modBuildNumber", String.valueOf(effectiveBuildNumber))
+
+        gradlePropsFile.withOutputStream { out ->
+            updatedProps.store(out, null)
+        }
+
+        println "${jarBaseName} build number updated: X${currentBuildNumber} -> X${effectiveBuildNumber}"
+    }
+}
+
+if (shouldAutoIncrement) {
+    tasks.matching { it.name in ["build", "assemble", "reobf", "jar"] }.all { task ->
+        task.dependsOn persistBuildNumber
     }
 }

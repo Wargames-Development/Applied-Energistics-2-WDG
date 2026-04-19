@@ -1,26 +1,50 @@
-# exclude all
-/*
+# Gradle
+.gradle/
+build/
 
-# include important folders
-# need gradle 
-!gradle/
-!gradlew
-!gradlew.bat
-!build.gradle
-!gradle.properties
-!.travis.yml
+# IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
 
-# include markdowns
-!README.md
-!LICENSE
-!CONTRIBUTING.md
+# Eclipse
+.metadata/
+.project
+.classpath
+.settings/
 
-# include sourcecode
-!src/
+# VSCode
+.vscode/
 
-# include git important files
-!.gitmodules
-!.gitignore
+# OS files
+.DS_Store
+Thumbs.db
 
-# code format to reduce noise in git commits
-!codeformat/
+# Logs
+logs/
+*.log
+
+# Forge / run dirs
+run/
+eclipse/
+
+# Compiled classes
+*.class
+
+# JARs (keep built outputs ignored unless you explicitly want them)
+build/libs/*.jar
+
+# Local config overrides
+*.local.properties
+
+# Generated resources
+bin/
+
+# Mac
+.AppleDouble
+.LSOverride
+
+# Windows
+Desktop.ini
